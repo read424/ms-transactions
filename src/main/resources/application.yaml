@@ -71,4 +71,12 @@ resilience4j:
     instances:
       account-validation:
         cancelRunningFuture: true
-        timeoutDuration: 5s
+        timeoutDuration: 2s
+  retry:
+    instances:
+      account-validation:
+        maxAttempts: 3
+        waitDuration: 1000
+        retryExceptions:
+          - java.io.IOException
+          - java.net.SocketTimeoutException
