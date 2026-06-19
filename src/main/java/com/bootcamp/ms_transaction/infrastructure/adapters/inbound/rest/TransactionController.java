@@ -1,7 +1,6 @@
 package com.bootcamp.ms_transaction.infrastructure.adapters.inbound.rest;
 
-import com.bootcamp.ms_transaction.infrastructure.adapters.inbound.rest.request.*;
-import com.bootcamp.ms_transaction.infrastructure.adapters.inbound.rest.response.*;
+import com.bootcamp.ms_transaction.infrastructure.adapters.inbound.rest.models.*;
 import com.bootcamp.ms_transaction.application.ports.input.*;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

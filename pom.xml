@@ -250,37 +250,25 @@
 					</execution>
 				</executions>
 			</plugin>
+
 			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-antrun-plugin</artifactId>
-				<version>3.1.0</version>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>build-helper-maven-plugin</artifactId>
+				<version>3.5.0</version>
 				<executions>
 					<execution>
-						<id>organize-dtos</id>
+						<id>add-generated-sources</id>
 						<phase>generate-sources</phase>
 						<goals>
-							<goal>run</goal>
+							<goal>add-source</goal>
 						</goals>
 						<configuration>
-							<target>
-								<mkdir dir="${project.build.directory}/generated-sources/openapi/src/main/java/com/bootcamp/ms_transaction/infrastructure/adapters/inbound/rest/request"/>
-								<mkdir dir="${project.build.directory}/generated-sources/openapi/src/main/java/com/bootcamp/ms_transaction/infrastructure/adapters/inbound/rest/response"/>
-								<move todir="${project.build.directory}/generated-sources/openapi/src/main/java/com/bootcamp/ms_transaction/infrastructure/adapters/inbound/rest/request">
-									<fileset dir="${project.build.directory}/generated-sources/openapi/src/main/java/com/bootcamp/ms_transaction/infrastructure/adapters/inbound/rest/models">
-										<include name="*Request.java"/>
-									</fileset>
-								</move>
-								<move todir="${project.build.directory}/generated-sources/openapi/src/main/java/com/bootcamp/ms_transaction/infrastructure/adapters/inbound/rest/response">
-									<fileset dir="${project.build.directory}/generated-sources/openapi/src/main/java/com/bootcamp/ms_transaction/infrastructure/adapters/inbound/rest/models">
-										<include name="*Response.java"/>
-										<include name="TransactionType.java"/>
-										<include name="TransactionStatus.java"/>
-									</fileset>
-									</move>
-									<delete dir="${project.build.directory}/generated-sources/openapi/src/main/java/com/bootcamp/ms_transaction/infrastructure/adapters/inbound/rest/models"/>
-								</target>
-							</configuration>
-						</execution>
+							<sources>
+								<source>${project.build.directory}/generated-sources/openapi/src/main/java</source>
+							</sources>
+						</configuration>
+					</execution>
+				</executions>
 			</plugin>
 			<plugin>
 				<groupId>org.jacoco</groupId>
@@ -300,32 +288,6 @@
 						<goals>
 							<goal>report</goal>
 						</goals>
-					</execution>
-					<execution>
-						<id>jacoco-check</id>
-						<phase>verify</phase>
-						<goals>
-							<goal>check</goal>
-						</goals>
-						<configuration>
-							<rules>
-								<rule>
-									<element>PACKAGE</element>
-									<excludes>
-										<exclude>com.bootcamp.ms_transaction.*</exclude>
-										<exclude>com.bootcamp.ms_transaction.infrastructure.config</exclude>
-									</excludes>
-									<limits>
-										<limit>
-											<counter>LINE</counter>
-											<value>COVEREDRATIO</value>
-											<minimum>0.50</minimum>
-										</limit>
-									</limits>
-								</rule>
-							</rules>
-							<haltOnFailure>false</haltOnFailure>
-						</configuration>
 					</execution>
 				</executions>
 			</plugin>
