@@ -1,0 +1,321 @@
+openapi: 3.0.3
+info:
+  title: Transaction Service API
+  description: >
+    API REST para el registro de movimientos bancarios: depósitos, retiros,
+    pagos de crédito y cargos a tarjeta de crédito. Antes de persistir cada
+    movimiento, valida sincrónicamente contra Account Service o Credit
+    Service (según corresponda) vía WebClient. También expone la consulta
+    de movimientos históricos de un producto.
+    No expone consulta de saldos: esa responsabilidad vive en Account
+    Service y Credit Service, dueños de ese dato.
+  version: 1.0.0
+  contact:
+    name: NTTData Bootcamp - Banking Project
+
+servers:
+  - url: http://localhost:8084
+    description: Entorno local directo
+  - url: http://localhost:8080/transactions
+    description: A través del API Gateway
+
+tags:
+  - name: Transactions
+    description: Operaciones de movimiento y consulta de historial
+
+paths:
+
+  /transactions/deposits:
+    post:
+      tags: [Transactions]
+      summary: Registra un depósito en una cuenta bancaria
+      description: >
+        Valida contra Account Service que la cuenta existe y está activa.
+        Tras la validación, persiste el movimiento y solicita a Account
+        Service actualizar el balance.
+      operationId: createDeposit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DepositRequest'
+      responses:
+        '201':
+          description: Depósito registrado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionResponse'
+        '404':
+          description: La cuenta no existe en Account Service
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: La cuenta no está activa
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /transactions/withdrawals:
+    post:
+      tags: [Transactions]
+      summary: Registra un retiro de una cuenta bancaria
+      description: >
+        Valida contra Account Service saldo suficiente, límite mensual de
+        movimientos si la cuenta es SAVINGS, y día permitido del mes si la
+        cuenta es FIXED_TERM.
+      operationId: createWithdrawal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WithdrawalRequest'
+      responses:
+        '201':
+          description: Retiro registrado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionResponse'
+        '404':
+          description: La cuenta no existe en Account Service
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: >
+            Saldo insuficiente, límite mensual alcanzado (SAVINGS), o día no
+            permitido (FIXED_TERM)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /transactions/credit-payments:
+    post:
+      tags: [Transactions]
+      summary: Registra el pago de un producto de crédito
+      description: >
+        Valida contra Credit Service que el crédito existe. Aplica tanto a
+        préstamos (reduce outstandingBalance) como a tarjetas (incrementa
+        availableCredit) — el efecto concreto lo determina Credit Service.
+      operationId: createCreditPayment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreditPaymentRequest'
+      responses:
+        '201':
+          description: Pago registrado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionResponse'
+        '404':
+          description: El crédito no existe en Credit Service
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /transactions/card-charges:
+    post:
+      tags: [Transactions]
+      summary: Registra un consumo sobre una tarjeta de crédito
+      description: >
+        Valida contra Credit Service que el monto no excede availableCredit
+        antes de registrar el movimiento.
+      operationId: createCardCharge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CardChargeRequest'
+      responses:
+        '201':
+          description: Consumo registrado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionResponse'
+        '404':
+          description: La tarjeta no existe en Credit Service
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: El consumo excede el crédito disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /transactions/product/{productId}:
+    get:
+      tags: [Transactions]
+      summary: Lista el historial de movimientos de un producto bancario
+      description: >
+        Retorna todos los movimientos (depósitos, retiros, pagos, cargos)
+        asociados a una cuenta o crédito específico, ordenados del más
+        reciente al más antiguo.
+      operationId: findTransactionsByProduct
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ID de la cuenta o crédito (según corresponda)
+      responses:
+        '200':
+          description: Historial de movimientos del producto
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TransactionResponse'
+
+  /transactions/{id}:
+    get:
+      tags: [Transactions]
+      summary: Obtiene un movimiento por su ID
+      operationId: findTransactionById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Movimiento encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionResponse'
+        '404':
+          description: El movimiento no existe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+
+  schemas:
+
+    TransactionType:
+      type: string
+      enum: [DEPOSIT, WITHDRAWAL, CREDIT_PAYMENT, CARD_CHARGE]
+
+    TransactionStatus:
+      type: string
+      enum: [COMPLETED, REJECTED]
+
+    DepositRequest:
+      type: object
+      required: [accountId, amount]
+      properties:
+        accountId:
+          type: string
+          example: "665f1a2b3c4d5e6f7a8b9c0d"
+        amount:
+          type: number
+          format: double
+          exclusiveMinimum: true
+          minimum: 0
+          example: 500.00
+
+    WithdrawalRequest:
+      type: object
+      required: [accountId, amount]
+      properties:
+        accountId:
+          type: string
+          example: "665f1a2b3c4d5e6f7a8b9c0d"
+        amount:
+          type: number
+          format: double
+          exclusiveMinimum: true
+          minimum: 0
+          example: 200.00
+
+    CreditPaymentRequest:
+      type: object
+      required: [creditId, amount]
+      properties:
+        creditId:
+          type: string
+          example: "665f1a2b3c4d5e6f7a8b9c0e"
+        amount:
+          type: number
+          format: double
+          exclusiveMinimum: true
+          minimum: 0
+          example: 300.00
+
+    CardChargeRequest:
+      type: object
+      required: [creditId, amount]
+      properties:
+        creditId:
+          type: string
+          example: "665f1a2b3c4d5e6f7a8b9c0e"
+        amount:
+          type: number
+          format: double
+          exclusiveMinimum: true
+          minimum: 0
+          example: 150.00
+        description:
+          type: string
+          example: "Compra en supermercado"
+
+    TransactionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          $ref: '#/components/schemas/TransactionType'
+        productId:
+          type: string
+          description: accountId o creditId, según el tipo de movimiento
+        amount:
+          type: number
+          format: double
+        status:
+          $ref: '#/components/schemas/TransactionStatus'
+        description:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+          example: 422
+        error:
+          type: string
+          example: "Unprocessable Entity"
+        message:
+          type: string
+          example: "Monthly movement limit reached for savings account"
+        timestamp:
+          type: string
+          format: date-time
