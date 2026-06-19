@@ -17,8 +17,9 @@ public class KafkaConsumer {
   public void onDepositCompleted(DepositCompletedEvent event) {
     log.info("Received deposit.completed event for transaction: {}", event.getTransactionId());
     transactionRepository.findById(event.getTransactionId()).flatMap(transaction -> {
-      transaction.setStatus(TransactionStatus.COMPLETED);
-      return transactionRepository.save(transaction);
+      return transactionRepository.save(transaction.toBuilder()
+          .status(TransactionStatus.COMPLETED)
+          .build());
     }).subscribe(
         saved -> log.info("Transaction {} updated to COMPLETED", saved.getId()),
         error -> log.error("Error updating transaction: {}", event.getTransactionId(), error)

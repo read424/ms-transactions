@@ -40,16 +40,10 @@ public class TransactionService implements
     private final KafkaProducer kafkaProducer;
 
     /**
-     * {@inheritDoc}
      * Validates the account is active, persists the deposit, then
      * requests Account Service to increase the balance.
      */
     @Override
-    public Mono<Transaction> execute(String accountId, Double amount) {
-        // resolved by signature overload below — see createDeposit
-        return createDeposit(accountId, amount);
-    }
-
     public Mono<Transaction> createDeposit(String accountId, Double amount) {
         log.info("Processing deposit accountId={} amount={}", accountId, amount);
 
@@ -65,8 +59,10 @@ public class TransactionService implements
                             accountId);
                     return persistTransaction(TransactionType.DEPOSIT, accountId, amount, null)
                             .flatMap(transaction -> {
-                                transaction.setStatus(TransactionStatus.PENDING);
-                                return transactionRepository.save(transaction);
+                                Transaction pendingTransaction = transaction.toBuilder()
+                                        .status(TransactionStatus.PENDING)
+                                        .build();
+                                return transactionRepository.save(pendingTransaction);
                             })
                             .flatMap(transaction -> {
                                 DepositPendingEvent event = DepositPendingEvent.builder()
