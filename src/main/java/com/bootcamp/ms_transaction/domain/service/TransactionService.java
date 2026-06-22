@@ -10,6 +10,8 @@ import com.bootcamp.ms_transaction.domain.model.enums.TransactionType;
 import com.bootcamp.ms_transaction.infrastructure.adapters.outbound.messaging.DepositPendingEvent;
 import com.bootcamp.ms_transaction.infrastructure.adapters.outbound.messaging.KafkaProducer;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.timelimiter.annotation.TimeLimiter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -44,6 +46,8 @@ public class TransactionService implements
      * requests Account Service to increase the balance.
      */
     @Override
+    @CircuitBreaker(name = "account-validation", fallbackMethod = "createDepositFallback")
+    @TimeLimiter(name = "account-validation")
     public Mono<Transaction> createDeposit(String accountId, Double amount) {
         log.info("Processing deposit accountId={} amount={}", accountId, amount);
 
@@ -54,27 +58,6 @@ public class TransactionService implements
                         accountValidationPort.applyBalanceChange(accountId, amount)
                                 .thenReturn(transaction))
                 .doOnSuccess(t -> log.info("Deposit completed txId={}", t.getId()))
-                .onErrorResume(CallNotPermittedException.class, error -> {
-                    log.warn("Circuit breaker open for deposit accountId={}, saving as PENDING and publishing to Kafka",
-                            accountId);
-                    return persistTransaction(TransactionType.DEPOSIT, accountId, amount, null)
-                            .flatMap(transaction -> {
-                                Transaction pendingTransaction = transaction.toBuilder()
-                                        .status(TransactionStatus.PENDING)
-                                        .build();
-                                return transactionRepository.save(pendingTransaction);
-                            })
-                            .flatMap(transaction -> {
-                                DepositPendingEvent event = DepositPendingEvent.builder()
-                                        .transactionId(transaction.getId())
-                                        .accountId(accountId)
-                                        .amount(amount)
-                                        .timestamp(LocalDateTime.now())
-                                        .build();
-                                return kafkaProducer.sendDepositPending(event)
-                                        .thenReturn(transaction);
-                            });
-                })
                 .doOnError(e -> log.warn("Deposit rejected accountId={} reason={}",
                         accountId, e.getMessage()));
     }
@@ -83,6 +66,8 @@ public class TransactionService implements
      * Validates balance, monthly limit (SAVINGS), and allowed day (FIXED_TERM)
      * against Account Service before persisting the withdrawal.
      */
+    @CircuitBreaker(name = "account-validation")
+    @TimeLimiter(name = "account-validation")
     public Mono<Transaction> createWithdrawal(String accountId, Double amount) {
         log.info("Processing withdrawal accountId={} amount={}", accountId, amount);
 
@@ -102,6 +87,8 @@ public class TransactionService implements
      * Credit Service to apply it (reduces balance for loans, increases
      * availableCredit for cards — Credit Service decides which).
      */
+    @CircuitBreaker(name = "account-validation")
+    @TimeLimiter(name = "account-validation")
     public Mono<Transaction> createCreditPayment(String creditId, Double amount) {
         log.info("Processing credit payment creditId={} amount={}", creditId, amount);
 
@@ -120,6 +107,8 @@ public class TransactionService implements
      * Validates the charge does not exceed availableCredit before
      * persisting and applying it.
      */
+    @CircuitBreaker(name = "account-validation")
+    @TimeLimiter(name = "account-validation")
     public Mono<Transaction> createCardCharge(String creditId, Double amount, String description) {
         log.info("Processing card charge creditId={} amount={}", creditId, amount);
 
@@ -155,5 +144,28 @@ public class TransactionService implements
                 .createdAt(LocalDateTime.now())
                 .build();
         return transactionRepository.save(transaction);
+    }
+
+    public Mono<Transaction> createDepositFallback(String accountId, Double amount,
+            CallNotPermittedException ex) {
+        log.warn("Circuit breaker open for createDeposit accountId={}, saving as PENDING and publishing to Kafka",
+                accountId);
+        return persistTransaction(TransactionType.DEPOSIT, accountId, amount, null)
+                .flatMap(transaction -> {
+                    Transaction pendingTransaction = transaction.toBuilder()
+                            .status(TransactionStatus.PENDING)
+                            .build();
+                    return transactionRepository.save(pendingTransaction);
+                })
+                .flatMap(transaction -> {
+                    DepositPendingEvent event = DepositPendingEvent.builder()
+                            .transactionId(transaction.getId())
+                            .accountId(accountId)
+                            .amount(amount)
+                            .timestamp(LocalDateTime.now())
+                            .build();
+                    return kafkaProducer.sendDepositPending(event)
+                            .thenReturn(transaction);
+                });
     }
 }

@@ -4,16 +4,14 @@ import com.bootcamp.ms_transaction.domain.model.Transaction;
 import com.bootcamp.ms_transaction.domain.model.enums.TransactionStatus;
 import com.bootcamp.ms_transaction.domain.model.enums.TransactionType;
 import com.bootcamp.ms_transaction.infrastructure.adapters.inbound.rest.models.TransactionResponse;
-import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
+import org.mapstruct.*;
 import org.openapitools.jackson.nullable.JsonNullable;
 
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import org.mapstruct.Named;
 
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = MappingConstants.ComponentModel.SPRING)
 public interface TransactionDtoMapper {
   @Mapping(source = "id", target = "id")
   @Mapping(source = "productId", target = "productId")
