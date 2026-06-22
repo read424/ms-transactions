@@ -94,7 +94,11 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-actuator</artifactId>
 		</dependency>
-
+		<!-- Eureka Client -->
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+		</dependency>
 		<!-- Resilience4j -->
 		<dependency>
 			<groupId>io.github.resilience4j</groupId>
@@ -182,9 +186,10 @@
 				<executions>
 					<execution>
 						<id>validate</id>
-						<phase>validate</phase> <goals>
-						<goal>check</goal>
-					</goals>
+						<phase>validate</phase>
+						<goals>
+							<goal>check</goal>
+						</goals>
 					</execution>
 				</executions>
 			</plugin>
@@ -250,7 +255,6 @@
 					</execution>
 				</executions>
 			</plugin>
-
 			<plugin>
 				<groupId>org.codehaus.mojo</groupId>
 				<artifactId>build-helper-maven-plugin</artifactId>
@@ -293,5 +297,4 @@
 			</plugin>
 		</plugins>
 	</build>
-
 </project>
