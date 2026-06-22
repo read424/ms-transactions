@@ -1,6 +1,9 @@
 spring:
   application:
     name: ms-transaction
+  cloud:
+    config:
+      enabled: false
   kafka:
     bootstrap-servers: localhost:9092
     producer:
@@ -37,11 +40,12 @@ management:
     health:
       show-details: always
       show-components: always
+      validate-group-membership: false
       group:
         circuit-breaker:
           include: circuitBreakerHealth
         readiness:
-          include: db,kafka
+          include: kafka
     prometheus:
       enabled: true
   health:
@@ -80,3 +84,21 @@ resilience4j:
         retryExceptions:
           - java.io.IOException
           - java.net.SocketTimeoutException
+
+server:
+  port: 8084
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+  instance:
+    preferIpAddress: true
+    lease-renewal-interval-in-seconds: 10
+    lease-expiration-duration-in-seconds: 30
+
+account-service:
+  url: http://ACCOUNT-SERVICE
+
+credit-service:
+  url: http://CREDIT-SERVICE
