@@ -19,11 +19,4 @@ public class KafkaProducer {
       kafkaTemplate.send("deposit.pending", event.getTransactionId(), event);
     }).subscribeOn(Schedulers.boundedElastic()).then();
   }
-
-  public Mono<Void> sendDepositCompleted(DepositCompletedEvent event) {
-    return Mono.fromRunnable(() -> {
-      log.info("Publishing deposit.completed event for transaction: {}", event.getTransactionId());
-      kafkaTemplate.send("deposit.completed", event.getTransactionId(), event);
-    }).subscribeOn(Schedulers.boundedElastic()).then();
-  }
 }
