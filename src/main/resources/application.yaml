@@ -20,7 +20,7 @@ spring:
         spring.json.trusted.packages: "*"
   data:
     mongodb:
-      uri: mongodb://localhost:27017/bootcamp
+      auto-index-creation: true
 
 management:
   endpoints:

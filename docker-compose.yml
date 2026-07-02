@@ -1,0 +1,82 @@
+version: '3.9'
+
+services:
+  mongodb:
+    image: mongo:8.3.4
+    container_name: mongodb-transaction
+    ports:
+      - "27020:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: bootcamp_transaction_prod_2024
+      MONGO_INITDB_DATABASE: ms_transaction_prod
+    volumes:
+      - ./init-mongo.sh:/docker-entrypoint-initdb.d/init-mongo.sh:ro
+      - mongodb_transaction_data:/data/db
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - bootcamp-network
+    healthcheck:
+      test: echo 'db.adminCommand("ping")' | mongosh -u admin -p bootcamp_transaction_prod_2024 localhost:27017/admin
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7.2.4-alpine
+    container_name: redis-transaction
+    restart: unless-stopped
+    ports:
+      - "6382:6379"
+    command: redis-server --requirepass eYVX7EwVmmxKPCDmwMtyKVge8oLd2t81
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - bootcamp-network
+    healthcheck:
+      test: redis-cli -a eYVX7EwVmmxKPCDmwMtyKVge8oLd2t81 ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ms-transaction:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: read424/ms-transaction:latest
+    container_name: ms-transaction
+    ports:
+      - "8084:8084"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_CONFIG_IMPORT: configserver:http://service-config-server:8888
+      EUREKA_CLIENT_SERVICE_URL_DEFAULT_ZONE: http://service-eureka:8761/eureka/
+      SPRING_REDIS_HOST: redis-transaction
+      SPRING_REDIS_PORT: 6379
+      SPRING_REDIS_PASSWORD: eYVX7EwVmmxKPCDmwMtyKVge8oLd2t81
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka_broker:9092
+      JAVA_OPTS: -Xmx512m -Xms256m
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - bootcamp-network
+
+volumes:
+  mongodb_transaction_data:
+
+networks:
+  bootcamp-network:
+    name: bootcamp-network
+    external: true
