@@ -94,6 +94,11 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-actuator</artifactId>
 		</dependency>
+		<!-- Spring Cloud Config Client -->
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-config</artifactId>
+		</dependency>
 		<!-- Eureka Client -->
 		<dependency>
 			<groupId>org.springframework.cloud</groupId>
@@ -121,10 +126,10 @@
 			<version>2.2.0</version>
 		</dependency>
 
-		<!-- Kafka -->
+		<!-- Reactor Kafka (Pure reactive, no Spring Kafka) -->
 		<dependency>
-			<groupId>org.springframework.kafka</groupId>
-			<artifactId>spring-kafka</artifactId>
+			<groupId>io.projectreactor.kafka</groupId>
+			<artifactId>reactor-kafka</artifactId>
 		</dependency>
 
 		<!-- Micrometer Prometheus -->
