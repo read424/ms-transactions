@@ -1,9 +1,11 @@
 spring:
   application:
     name: ms-transaction
+  config:
+    import: ${SPRING_CONFIG_IMPORT:configserver:http://localhost:8888}
   cloud:
     config:
-      enabled: false
+      enabled: true
   kafka:
     bootstrap-servers: localhost:9092
     producer:
@@ -102,3 +104,10 @@ account-service:
 
 credit-service:
   url: http://CREDIT-SERVICE
+
+kafka:
+  topics:
+    transaction-deposit-completed: transaction.deposit.completed
+    transaction-withdrawal-completed: transaction.withdrawal.completed
+    transaction-transfer-completed: transaction.transfer.completed
+    transaction-credit-payment-completed: transaction.credit.payment.completed
