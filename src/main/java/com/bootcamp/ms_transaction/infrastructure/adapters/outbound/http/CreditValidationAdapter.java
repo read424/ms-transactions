@@ -19,7 +19,7 @@ import reactor.core.publisher.Mono;
 public class CreditValidationAdapter implements CreditValidationPort {
   private final WebClient.Builder webClientBuilder;
 
-  @Value("${credit-service.url:http://CREDIT-SERVICE}")
+  @Value("${credit-service.url:http://ms-credits}")
   private String creditServiceUrl;
 
   @Override

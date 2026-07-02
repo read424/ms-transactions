@@ -16,7 +16,7 @@ import java.time.LocalDate;
 public class AccountValidationAdapter implements AccountValidationPort {
   private final WebClient.Builder webClientBuilder;
 
-  @org.springframework.beans.factory.annotation.Value("${account-service.url:http://ACCOUNT-SERVICE}")
+  @org.springframework.beans.factory.annotation.Value("${account-service.url:http://ms-account}")
   private String accountServiceUrl;
 
   @Override
