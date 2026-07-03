@@ -4,11 +4,11 @@ import com.bootcamp.ms_transaction.application.ports.input.*;
 import com.bootcamp.ms_transaction.application.ports.output.AccountValidationPort;
 import com.bootcamp.ms_transaction.application.ports.output.CreditValidationPort;
 import com.bootcamp.ms_transaction.application.ports.output.TransactionRepositoryPort;
+import com.bootcamp.ms_transaction.application.ports.output.TransactionEventPublisherPort;
 import com.bootcamp.ms_transaction.domain.model.Transaction;
 import com.bootcamp.ms_transaction.domain.model.enums.TransactionStatus;
 import com.bootcamp.ms_transaction.domain.model.enums.TransactionType;
-import com.bootcamp.ms_transaction.infrastructure.adapters.outbound.messaging.DepositPendingEvent;
-import com.bootcamp.ms_transaction.infrastructure.adapters.outbound.messaging.KafkaProducer;
+import com.bootcamp.ms_transaction.domain.model.event.TransactionCompletedEvent;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.timelimiter.annotation.TimeLimiter;
@@ -39,7 +39,7 @@ public class TransactionService implements
     private final TransactionRepositoryPort transactionRepository;
     private final AccountValidationPort accountValidationPort;
     private final CreditValidationPort creditValidationPort;
-    private final KafkaProducer kafkaProducer;
+    private final TransactionEventPublisherPort eventPublisher;
 
     /**
      * Validates the account is active, persists the deposit, then
@@ -57,9 +57,23 @@ public class TransactionService implements
                 .flatMap(transaction ->
                         accountValidationPort.applyBalanceChange(accountId, amount)
                                 .thenReturn(transaction))
+                .flatMap(transaction -> publishDepositCompleted(transaction, accountId, amount)
+                        .thenReturn(transaction))
                 .doOnSuccess(t -> log.info("Deposit completed txId={}", t.getId()))
                 .doOnError(e -> log.warn("Deposit rejected accountId={} reason={}",
                         accountId, e.getMessage()));
+    }
+
+    private Mono<Void> publishDepositCompleted(Transaction transaction, String accountId, Double amount) {
+        TransactionCompletedEvent event = TransactionCompletedEvent.builder()
+                .transactionId(transaction.getId())
+                .type("DEPOSIT")
+                .sourceAccountId(accountId)
+                .amount(amount)
+                .status(transaction.getStatus().name())
+                .completedAt(LocalDateTime.now())
+                .build();
+        return eventPublisher.publishDepositCompleted(event);
     }
 
     /**
@@ -77,9 +91,23 @@ public class TransactionService implements
                 .flatMap(transaction ->
                         accountValidationPort.applyBalanceChange(accountId, -amount)
                                 .thenReturn(transaction))
+                .flatMap(transaction -> publishWithdrawalCompleted(transaction, accountId, amount)
+                        .thenReturn(transaction))
                 .doOnSuccess(t -> log.info("Withdrawal completed txId={}", t.getId()))
                 .doOnError(e -> log.warn("Withdrawal rejected accountId={} reason={}",
                         accountId, e.getMessage()));
+    }
+
+    private Mono<Void> publishWithdrawalCompleted(Transaction transaction, String accountId, Double amount) {
+        TransactionCompletedEvent event = TransactionCompletedEvent.builder()
+                .transactionId(transaction.getId())
+                .type("WITHDRAWAL")
+                .sourceAccountId(accountId)
+                .amount(amount)
+                .status(transaction.getStatus().name())
+                .completedAt(LocalDateTime.now())
+                .build();
+        return eventPublisher.publishWithdrawalCompleted(event);
     }
 
     /**
@@ -98,9 +126,23 @@ public class TransactionService implements
                 .flatMap(transaction ->
                         creditValidationPort.applyPayment(creditId, amount)
                                 .thenReturn(transaction))
+                .flatMap(transaction -> publishCreditPaymentCompleted(transaction, creditId, amount)
+                        .thenReturn(transaction))
                 .doOnSuccess(t -> log.info("Credit payment completed txId={}", t.getId()))
                 .doOnError(e -> log.warn("Credit payment rejected creditId={} reason={}",
                         creditId, e.getMessage()));
+    }
+
+    private Mono<Void> publishCreditPaymentCompleted(Transaction transaction, String creditId, Double amount) {
+        TransactionCompletedEvent event = TransactionCompletedEvent.builder()
+                .transactionId(transaction.getId())
+                .type("CREDIT_PAYMENT")
+                .sourceAccountId(creditId)
+                .amount(amount)
+                .status(transaction.getStatus().name())
+                .completedAt(LocalDateTime.now())
+                .build();
+        return eventPublisher.publishCreditPaymentCompleted(event);
     }
 
     /**
@@ -118,9 +160,23 @@ public class TransactionService implements
                 .flatMap(transaction ->
                         creditValidationPort.applyCharge(creditId, amount)
                                 .thenReturn(transaction))
+                .flatMap(transaction -> publishTransferCompleted(transaction, creditId, amount)
+                        .thenReturn(transaction))
                 .doOnSuccess(t -> log.info("Card charge completed txId={}", t.getId()))
                 .doOnError(e -> log.warn("Card charge rejected creditId={} reason={}",
                         creditId, e.getMessage()));
+    }
+
+    private Mono<Void> publishTransferCompleted(Transaction transaction, String creditId, Double amount) {
+        TransactionCompletedEvent event = TransactionCompletedEvent.builder()
+                .transactionId(transaction.getId())
+                .type("TRANSFER")
+                .sourceAccountId(creditId)
+                .amount(amount)
+                .status(transaction.getStatus().name())
+                .completedAt(LocalDateTime.now())
+                .build();
+        return eventPublisher.publishTransferCompleted(event);
     }
 
     @Override
@@ -158,13 +214,15 @@ public class TransactionService implements
                     return transactionRepository.save(pendingTransaction);
                 })
                 .flatMap(transaction -> {
-                    DepositPendingEvent event = DepositPendingEvent.builder()
+                    TransactionCompletedEvent event = TransactionCompletedEvent.builder()
                             .transactionId(transaction.getId())
-                            .accountId(accountId)
+                            .type("DEPOSIT_PENDING")
+                            .sourceAccountId(accountId)
                             .amount(amount)
-                            .timestamp(LocalDateTime.now())
+                            .status(transaction.getStatus().name())
+                            .completedAt(LocalDateTime.now())
                             .build();
-                    return kafkaProducer.sendDepositPending(event)
+                    return eventPublisher.publishDepositCompleted(event)
                             .thenReturn(transaction);
                 });
     }
